@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>写小说直播 - 控制台</title>
+<link rel="stylesheet" href="/static/console.css">
+</head>
+<body>
+<nav>
+  <div class="brand">控制台</div>
+  <button class="active" data-tab="live">直播控制</button>
+  <button data-tab="danmaku">弹幕接入</button>
+  <button data-tab="novel">小说管理</button>
+  <button data-tab="model">模型配置</button>
+  <button data-tab="voice">语音配置</button>
+  <button data-tab="interaction">互动配置</button>
+  <div class="spacer"></div>
+  <div class="foot">write-novel-live<br>AI 现场写作直播间</div>
+</nav>
+<main>
+  <h1 id="tab-title">直播控制</h1>
+  <p class="sub" id="tab-sub">开写 / 暂停 / 编辑 / 字速</p>
+
+  <!-- 直播控制 -->
+  <div id="tab-live">
+    <div class="card">
+      <h2>开播 <span id="live-status" class="pill">空闲</span></h2>
+      <div class="row">
+        <select id="novel-select" style="min-width:300px"><option value="">加载中…</option></select>
+        <button class="act primary" id="btn-start">开写</button>
+        <button class="act ghost" id="btn-stop">停止循环</button>
+      </div>
+      <div class="row">
+        <button class="act" id="btn-pause">暂停</button>
+        <button class="act" id="btn-resume">恢复</button>
+        <button class="act ghost" id="btn-skip">跳过当前段</button>
+      </div>
+      <div class="row">
+        <span class="hint">字速</span>
+        <input type="range" id="speed" min="40" max="300" step="10" value="100">
+        <span class="hint" id="speed-label">100ms/字</span>
+      </div>
+      <div id="progress">总字数 <b id="p-words">0</b> / <span id="p-target-words">-</span>
+        ｜ 第 <b id="p-chapter">-</b> 章 / 目标 <span id="p-target-chapters">-</span> 章
+        <div class="bar" style="margin-top:6px"><i id="p-bar" style="width:0%"></i></div>
+      </div>
+      <p class="hint" style="margin-top:10px">
+        直播画面地址（OBS 浏览器源）：<span id="stage-url"></span>
+      </p>
+    </div>
+    <div class="card">
+      <h2>人工编辑</h2>
+      <div class="row">
+        <select id="edit-chapter"><option value="">选择章节…</option></select>
+        <select id="edit-para"><option value="">选择段落…</option></select>
+        <button class="act ghost" id="btn-load-para">载入</button>
+      </div>
+      <textarea id="edit-text" placeholder="载入段落后修改（保存前会自动暂停写作）"></textarea>
+      <div class="row" style="margin-top:10px">
+        <button class="act primary" id="btn-save-edit">保存并恢复写作</button>
+        <span class="hint" id="edit-msg"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 弹幕接入 -->
+  <div id="tab-danmaku" style="display:none">
+    <div class="card">
+      <h2>连接直播间 <span id="dm-status">未连接</span></h2>
+      <div class="row">
+        <input type="text" id="dm-room" style="flex:1;min-width:320px"
+               placeholder="房间号 / 直播间链接 / 抖音分享口令，如：https://live.douyin.com/745961234">
+      </div>
+      <div class="row">
+        <button class="act primary" id="btn-dm-connect">连接</button>
+        <button class="act ghost" id="btn-dm-disconnect">断开</button>
+        <button class="act ghost" id="btn-dm-mock">演示模式（mock 弹幕）</button>
+      </div>
+      <p class="hint">
+        需本机运行 douyinLive 服务（默认 ws://127.0.0.1:1088）；连接后弹幕实时显示在直播页侧栏，
+        观众聊天会触发 AI 主播闲聊回复。演示模式无需 douyinLive。
+      </p>
+    </div>
+  </div>
+
+  <!-- 小说管理 -->
+  <div id="tab-novel" style="display:none">
+    <div class="card">
+      <h2>生成新书 <span class="hint">设定卡可全部留空，由 AI 自定</span></h2>
+      <div class="grid2">
+        <div class="field">
+          <label>题材方向（如：都市异能 / 东方玄幻 / 悬疑灵异）</label>
+          <input type="text" id="ng-genre" placeholder="留空 = AI 自定">
+        </div>
+        <div class="field">
+          <label>核心创意提示</label>
+          <input type="text" id="ng-idea" placeholder="如：能听见旧物回声的修复师">
+        </div>
+        <div class="field">
+          <label>目标字数</label>
+          <input type="number" id="ng-words" placeholder="默认用全局配置">
+        </div>
+        <div class="field">
+          <label>目标章数</label>
+          <input type="number" id="ng-chapters" placeholder="默认用全局配置">
+        </div>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="act primary" id="btn-gen-novel">生成新书设定</button>
+        <span class="hint" id="ng-status">生成约需 1-2 分钟（含一次自动重试）</span>
+      </div>
+    </div>
+    <div class="card">
+      <h2>书籍列表</h2>
+      <table class="list" id="book-table">
+        <thead><tr><th>书名</th><th>题材</th><th>进度</th><th>状态</th><th class="actions">操作</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <p class="hint" style="margin-top:8px">「开写」将该书设为直播书并启动写作循环；归档后书籍变为只读。</p>
+    </div>
+  </div>
+
+  <!-- 模型配置 -->
+  <div id="tab-model" style="display:none">
+    <div class="card">
+      <h2>模型档位 <span class="hint">OpenAI 兼容；本地运行时（LM Studio / Ollama）免 key</span></h2>
+      <div id="model-profiles" class="grid2"></div>
+      <div class="row" style="margin-top:14px">
+        <button class="act primary" id="btn-save-config">保存全部配置</button>
+        <span class="hint">保存后立即生效（无需重启服务）</span>
+      </div>
+    </div>
+    <div class="card">
+      <h2>写作节奏</h2>
+      <div class="grid4">
+        <div class="field"><label>每段最少字数</label><input type="number" id="w-para-min"></div>
+        <div class="field"><label>每段最多字数</label><input type="number" id="w-para-max"></div>
+        <div class="field"><label>章节字数上限</label><input type="number" id="w-chapter-max"></div>
+        <div class="field"><label>互动间隙（秒）</label><input type="number" id="w-gap"></div>
+        <div class="field"><label>目标总字数</label><input type="number" id="w-target-words"></div>
+        <div class="field"><label>目标章数</label><input type="number" id="w-target-chapters"></div>
+      </div>
+      <p class="hint" style="margin-top:8px">目标字数/章数是收官硬校验（≥80万字/≥150章 才允许完结）。</p>
+    </div>
+    <div class="card">
+      <h2>测试连接</h2>
+      <div class="row">
+        <select id="llm-test-provider">
+          <option value="writing">写作模型</option>
+          <option value="chat">闲聊模型</option>
+          <option value="review">审核模型</option>
+        </select>
+        <input type="text" id="llm-test-prompt" style="flex:1;min-width:260px" value="用一句话介绍你自己">
+        <button class="act" id="btn-llm-test">发送测试</button>
+      </div>
+      <div class="llm-out" id="llm-test-out"></div>
+    </div>
+  </div>
+
+  <!-- 语音配置 -->
+  <div id="tab-voice" style="display:none">
+    <div class="card">
+      <h2>语音引擎（OmniVoice）</h2>
+      <div class="row">
+        <label class="hint">启用</label>
+        <select id="tts-enabled" style="width:90px">
+          <option value="false">关闭</option>
+          <option value="true">开启</option>
+        </select>
+        <input type="text" id="tts-url" style="min-width:260px" placeholder="http://127.0.0.1:9877">
+        <span class="pill" id="tts-state">-</span>
+      </div>
+      <div class="row">
+        <label class="hint">AI 主播音色</label>
+        <select id="tts-voice" style="min-width:220px"></select>
+        <button class="act ghost" id="btn-voice-preview">试听</button>
+      </div>
+      <p class="hint">同一时刻全局只有一个语音在播（闲聊/试听共用互斥队列）；正文朗读与角色配音在后续版本启用。</p>
+    </div>
+    <div class="card">
+      <h2>角色-音色绑定 <span class="hint">数据先行，角色配音后续版本生效</span></h2>
+      <div class="row">
+        <select id="bind-novel" style="min-width:280px"><option value="">选择书籍…</option></select>
+      </div>
+      <table class="list" id="bind-table">
+        <thead><tr><th>角色</th><th>人设</th><th>音色</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="row" style="margin-top:12px">
+        <button class="act" id="btn-save-bind">保存绑定</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 互动配置 -->
+  <div id="tab-interaction" style="display:none">
+    <div class="card">
+      <h2>AI 主播闲聊</h2>
+      <div class="grid2">
+        <div class="field"><label>闲聊开关</label>
+          <select id="i-chat-enabled" style="width:120px">
+            <option value="true">开启</option>
+            <option value="false">关闭</option>
+          </select>
+        </div>
+        <div class="field"><label>节流窗口（秒，窗口内只回最新弹幕）</label>
+          <input type="number" id="i-chat-interval" min="1">
+        </div>
+      </div>
+      <p class="hint">闲聊只在气泡区与语音中出现，绝不会进入小说正文。</p>
+    </div>
+    <div class="card">
+      <h2>剧情投票 <span id="vote-status" class="pill">-</span></h2>
+      <div class="grid2">
+        <div class="field"><label>投票开关</label>
+          <select id="i-vote-enabled" style="width:120px">
+            <option value="true">开启</option>
+            <option value="false">关闭</option>
+          </select>
+        </div>
+        <div class="field"><label>章末自动出题发起</label>
+          <select id="i-auto-vote" style="width:120px">
+            <option value="true">自动（章末 AI 出题）</option>
+            <option value="false">仅手动发起</option>
+          </select>
+        </div>
+        <div class="field"><label>投票时长（秒）</label>
+          <input type="number" id="i-vote-duration" min="10">
+        </div>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <input type="text" id="v-question" placeholder="投票问题（可留空点「AI 出题」按剧情生成）" style="flex:1;min-width:300px">
+        <button class="act" id="btn-vote-gen">AI 出题</button>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <input type="text" id="v-opt1" placeholder="选项 1" style="flex:1;min-width:140px">
+        <input type="text" id="v-opt2" placeholder="选项 2" style="flex:1;min-width:140px">
+        <input type="text" id="v-opt3" placeholder="选项 3（可空）" style="flex:1;min-width:140px">
+        <button class="act primary" id="btn-vote-start">发起投票</button>
+        <button class="act ghost" id="btn-vote-close">结束投票</button>
+      </div>
+      <p class="hint" style="margin-top:8px">
+        观众在直播间弹幕输入 1/2/3 投票；结果自动进入「观众素材」影响后续细节走向（不改主线）。
+      </p>
+    </div>
+    <div class="card">
+      <h2>礼物剧情事件 <span class="hint">礼物 → 事件文案，未配置的礼物由 AI 现场生成并自动回填</span></h2>
+      <div class="row">
+        <label class="hint">礼物事件开关</label>
+        <select id="i-gift-enabled" style="width:120px">
+          <option value="true">开启</option>
+          <option value="false">关闭</option>
+        </select>
+        <button class="act" id="btn-gift-add" style="margin-left:12px">添加映射</button>
+      </div>
+      <table class="list" id="gift-table">
+        <thead><tr><th style="width:180px">礼物名</th><th>剧情事件文案</th><th class="actions">操作</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="row" style="margin-top:10px">
+        <button class="act primary" id="btn-save-interaction">保存互动配置</button>
+        <span class="hint" id="pool-hint"></span>
+      </div>
+    </div>
+  </div>
+</main>
+<div id="toasts"></div>
+<script src="/static/console-core.js"></script>
+<script src="/static/console-live.js"></script>
+<script src="/static/console-novel.js"></script>
+<script src="/static/console-model.js"></script>
+<script src="/static/console-voice.js"></script>
+<script src="/static/console-interaction.js"></script>
+</body>
+</html>

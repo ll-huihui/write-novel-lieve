@@ -1,0 +1,16 @@
+{
+  "label": "沉稳中年女声",
+  "lang": "Chinese",
+  "gender": "Female / 女",
+  "age": "Middle-aged / 中年",
+  "pitch": "Low Pitch / 低音调",
+  "style": "Auto",
+  "accent": "Auto",
+  "dialect": "Auto",
+  "ns": 32,
+  "gs": 2.0,
+  "dn": true,
+  "sp": 1.0,
+  "pp": true,
+  "po": true
+}

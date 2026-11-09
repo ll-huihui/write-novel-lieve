@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>写小说直播 - 稿纸</title>
+<style>
+  /* tokens 与控制台同源（console.css）：米纸 + 墨色 + 朱砂；字号/行高勿动（格线与 charsPerLine 依赖） */
+  :root {
+    --paper-bg: #fdfbf4;
+    --paper-line: #e3dcc6;
+    --desk: #ede6d5;
+    --panel: #faf7ef;
+    --ink: #2b2620;
+    --ink-light: #857c68;
+    --accent: #8c2f24;
+    --accent-soft: #f0e0dc;
+    --border: #ddd3bd;
+    --border-deep: #c9bda0;
+    --state-writing: #2e6e46;
+    --state-gap: #b07d2b;
+    --state-paused: #8a8a8a;
+    --state-ending: #6a4a8c;
+    --serif: "Noto Serif SC", "Songti SC", SimSun, serif;
+    --font-ui: "Microsoft YaHei", sans-serif;
+    --font-size: 20px;
+    --line-height: 36px;
+    --shadow: 0 1px 2px rgba(60, 50, 30, 0.06), 0 4px 14px rgba(60, 50, 30, 0.08);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: var(--serif);
+    background: var(--desk);
+    background-image: radial-gradient(rgba(140, 47, 36, 0.025) 1px, transparent 1px);
+    background-size: 22px 22px;
+    color: var(--ink);
+    height: 100vh;
+    display: flex;
+    overflow: hidden;
+  }
+  main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+
+  /* ================= 直播区（OBS 捕获区域，固定不滚动） ================= */
+  #live-area { flex: 1; display: flex; min-height: 0; position: relative; }
+
+  /* ---- 投票卡片（T8）：直播区左下角叠层 ---- */
+  #vote-card {
+    position: absolute; left: 16px; bottom: 16px; z-index: 20; width: 240px;
+    background: var(--panel); border: 1px solid var(--border-deep); border-radius: 12px;
+    box-shadow: var(--shadow); padding: 12px 14px; font-family: var(--font-ui);
+    opacity: 0.96;
+  }
+  #vote-card[hidden] { display: none; }
+  #vote-card.closed { opacity: 0.82; }
+  .vote-head { font-size: 11px; font-weight: 700; letter-spacing: 3px; color: var(--accent);
+    margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+  .vote-head::before { content: ""; width: 8px; height: 8px; border-radius: 50%;
+    background: var(--accent); }
+  #vote-card.closed .vote-head::before { background: var(--ink-light); }
+  #vote-question { font-family: var(--serif); font-size: 14px; font-weight: 700;
+    line-height: 1.5; margin-bottom: 8px; color: var(--ink); }
+  .vote-opt { display: flex; align-items: center; gap: 8px; font-size: 12px;
+    padding: 5px 8px; border-radius: 7px; margin-bottom: 4px;
+    background: #fffef9; border: 1px solid var(--border); color: var(--ink-light); }
+  .vote-opt .vote-key { flex: none; width: 18px; height: 18px; border-radius: 5px;
+    background: var(--ink); color: #f7f3e8; font-size: 11px; display: flex;
+    align-items: center; justify-content: center; }
+  .vote-opt .vote-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap; }
+  .vote-opt .vote-count { flex: none; font-weight: 700; color: var(--ink); }
+  .vote-opt.leading { border-color: var(--accent); color: var(--ink);
+    background: var(--accent-soft); }
+  #vote-timer { font-size: 11px; color: var(--ink-light); margin-top: 6px; }
+  /* 中央：书名信息 + （章节栏 + A4 稿纸）整体居中，章节栏紧贴稿纸 */
+  #live-center { flex: 1; display: flex; flex-direction: column;
+    align-items: center; min-width: 0; min-height: 0; }
+  /* 稿纸列：标题信息 + 稿纸纵向排列；--sheet-scale 由 JS 设在此处（子树统一缩放），
+     #book-info 宽度=稿纸宽度 → 标题相对稿纸居中（不受左侧章节栏宽度影响） */
+  #paper-col { --sheet-scale: 1; display: flex; flex-direction: column;
+    align-items: center; min-height: 0; }
+  #book-info { width: calc(628px * var(--sheet-scale)); padding: 10px 0 6px;
+    font-family: var(--serif); text-align: center; flex: none; }
+  #book-title { font-size: 21px; font-weight: 700; letter-spacing: 3px; }
+  #chapter-title { font-size: 14px; color: var(--ink-light); margin-left: 14px; }
+  #book-progress { font-size: 13px; color: var(--ink-light); margin-top: 4px;
+    font-family: var(--font-ui); }
+  #book-progress b { color: var(--accent); font-family: var(--serif); }
+  #stage-row { flex: 1; display: flex; justify-content: center;
+    align-items: flex-start; min-height: 0; width: 100%; padding: 6px 16px 12px; }
+  /* 章节栏与稿纸一行，stretch 让章节栏自动等高于稿纸 */
+  #sheet-row { display: flex; align-items: stretch; gap: 14px; min-height: 0; }
+  /* 章节栏：书签式窄栏，贴着稿纸；随 sheet-row stretch 自动与稿纸等高；内部滚动无可见滚动条 */
+  #chapter-rail {
+    width: 176px; flex: none;
+    display: flex; flex-direction: column;
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 10px; box-shadow: var(--shadow); padding: 10px 0;
+  }
+  .rail-head { font-family: var(--serif); font-size: 14px; font-weight: 700;
+    letter-spacing: 4px; color: var(--ink); padding: 0 14px 8px; }
+  .rail-head::after { content: ""; display: block; width: 24px; height: 3px;
+    background: var(--accent); margin-top: 6px; border-radius: 2px; }
+  #rail-list { flex: 1; overflow-y: auto; padding: 4px 0; min-height: 0;
+    scrollbar-width: none; }
+  #rail-list::-webkit-scrollbar { display: none; }
+  .rail-item {
+    all: unset; cursor: pointer; display: block; width: 100%;
+    font-family: var(--serif); font-size: 12px; color: var(--ink-light);
+    padding: 7px 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    transition: color 150ms ease, background 150ms ease;
+  }
+  .rail-item:hover { color: var(--ink); background: rgba(140, 47, 36, 0.05); }
+  .rail-item.active { color: var(--accent); font-weight: 700;
+    background: linear-gradient(90deg, rgba(140, 47, 36, 0.1), transparent); }
+  #sheet-frame { flex: none; display: flex; justify-content: center; min-height: 0; min-width: 0; }
+  /* A4 稿纸：每页一张（box-sizing 为 border-box，min-height 含留边 96px）。
+     --sheet-scale 由 JS 按可视区百分比设定，整页真实等比缩放（非 transform，无模糊，布局即视觉） */
+  .page {
+    position: relative;
+    /* A4 比例（1:1.414）：22 行 × 36px + 上下留边 96px = 888px 高 → 宽 888 ÷ √2 ≈ 628px */
+    --line-height: calc(36px * var(--sheet-scale));
+    --font-size: calc(20px * var(--sheet-scale));
+    font-size: var(--font-size);
+    width: calc(628px * var(--sheet-scale));
+    min-height: calc(22 * var(--line-height) + 96px * var(--sheet-scale));
+    background: var(--paper-bg);
+    box-shadow: var(--shadow);
+    border: 1px solid #e9e2cf;
+    padding: calc(44px * var(--sheet-scale)) calc(56px * var(--sheet-scale)) calc(52px * var(--sheet-scale));
+  }
+  .page + .page { display: none; }  /* 整屏只显示当前页，由 JS 控制翻页 */
+  .page .page-no {
+    position: absolute; right: 20px; bottom: 14px; font-family: var(--font-ui);
+    font-size: 11px; color: #b8b2a2;
+  }
+  /* 格线属于每个文字行自身（以行高为周期）：换行/翻页永远贴合不露馅 */
+  .line {
+    min-height: var(--line-height);
+    white-space: pre-wrap;
+    background: repeating-linear-gradient(
+      transparent, transparent calc(var(--line-height) - 1px),
+      var(--paper-line) calc(var(--line-height) - 1px), var(--paper-line) var(--line-height));
+  }
+  .line.indent { text-indent: 2em; }
+  /* 章头：每章另起一页，首行为居中章名（占 2 格行高，与格线对齐） */
+  .chapter-heading {
+    display: flex; align-items: center; justify-content: center;
+    min-height: calc(72px * var(--sheet-scale));
+    font-size: calc(22px * var(--sheet-scale)); font-weight: 700;
+    letter-spacing: 6px; color: var(--ink); font-family: var(--serif);
+  }
+  #cursor {
+    display: inline-block; width: 2px; height: 1.1em; background: var(--accent);
+    vertical-align: -0.2em; margin-left: 1px;
+    animation: blink 1s steps(1) infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* ================= 操作区（页底横条，主播用，不属直播画面主体） ================= */
+  #op-bar {
+    flex: none; display: flex; align-items: center; gap: 8px;
+    padding: 8px 16px; background: var(--panel); border-top: 1px solid var(--border);
+    font-family: var(--font-ui); font-size: 13px;
+  }
+  #op-bar .spacer { flex: 1; }
+  #op-bar button {
+    all: unset; cursor: pointer; font-size: 13px; padding: 5px 14px; border-radius: 7px;
+    background: var(--ink); color: #f7f3e8; white-space: nowrap;
+    transition: opacity 150ms ease;
+  }
+  #op-bar button:hover { opacity: 0.85; }
+  #op-bar button.ghost { background: transparent; color: var(--ink-light);
+    border: 1px solid var(--border-deep); }
+  #op-bar button.ghost:hover { color: var(--accent); border-color: var(--accent); opacity: 1; }
+  #op-bar button:disabled { opacity: 0.35; cursor: not-allowed; }
+  #op-bar input {
+    font: inherit; font-size: 12px; padding: 5px 8px; width: 190px;
+    border: 1px solid var(--border-deep); border-radius: 6px; background: #fffef9; color: var(--ink);
+  }
+  #op-bar .vsep { width: 1px; height: 22px; background: var(--border-deep); margin: 0 4px; }
+  #state-bar {
+    font-size: 13px; padding: 3px 12px; border-radius: 999px; flex: none;
+    color: var(--state-paused); background: #eceae4; white-space: nowrap;
+    transition: background 300ms ease;
+  }
+  #state-bar.writing { color: var(--state-writing); background: #e2ecdf; }
+  #state-bar.gap { color: var(--state-gap); background: #f5ead3; }
+  #state-bar.paused { color: #6b675e; background: #eceae4; }
+  #state-bar.ending { color: var(--state-ending); background: #eae3f2; }
+  #state-bar.finished { color: var(--accent); background: var(--accent-soft); }
+  #word-count { color: var(--ink-light); white-space: nowrap; }
+  #page-label { color: var(--ink-light); white-space: nowrap; min-width: 84px; text-align: center; }
+  #dm-status { font-size: 11px; color: var(--ink-light); white-space: nowrap; }
+  #dm-status.connected { color: var(--state-writing); }
+  #dm-status.error { color: var(--accent); }
+
+  /* ---- 右侧弹幕面板（互动任务时迁入直播区叠层） ---- */
+  aside {
+    width: 300px; background: var(--panel); border-left: 1px solid var(--border);
+    display: flex; flex-direction: column; font-family: var(--font-ui);
+  }
+  .aside-head { padding: 13px 16px; font-size: 14px; font-weight: 600; font-family: var(--serif);
+    letter-spacing: 1px; border-bottom: 1px solid var(--border); color: var(--ink); }
+  #danmaku-list { flex: 1; overflow-y: auto; padding: 10px 12px; }
+  .dm { font-size: 13px; line-height: 1.55; margin-bottom: 7px; word-break: break-all; }
+  .dm .nick { color: var(--ink-light); margin-right: 4px; }
+  .dm .nick::after { content: "："; }
+  .dm.gift { background: #f5ead3; border: 1px solid #ecd9b2; border-radius: 8px;
+    padding: 5px 9px; color: #9a5b1e; }
+  .dm.gift .nick { color: #b07d2b; font-weight: 600; }
+  .dm.gift .nick::after { content: " "; }
+  #chat-bubbles { padding: 10px 12px; border-top: 1px solid var(--border); max-height: 34%;
+    overflow-y: auto; background: var(--paper-bg); }
+  .chat-bubble { background: #fffef9; border: 1px solid var(--border); border-left: 3px solid var(--accent);
+    border-radius: 4px 10px 10px 4px; padding: 8px 11px;
+    font-size: 13px; line-height: 1.6; margin-bottom: 8px; box-shadow: var(--shadow); }
+  .chat-bubble .who { font-size: 11px; color: var(--accent); margin-bottom: 2px; }
+
+  /* ---- 选书 / 生成新书面板 ---- */
+  #book-modal { position: fixed; inset: 0; z-index: 50; display: flex;
+    align-items: center; justify-content: center; }
+  #book-modal[hidden] { display: none; }
+  #book-mask { position: absolute; inset: 0; background: rgba(43, 38, 32, 0.45); }
+  #book-card {
+    position: relative; width: min(460px, 90vw); background: var(--panel);
+    border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow);
+    padding: 22px 26px; font-family: var(--font-ui);
+  }
+  #book-card h3 { font-family: var(--serif); font-size: 16px; letter-spacing: 1px;
+    margin: 14px 0 8px; display: flex; align-items: baseline; gap: 8px; }
+  #book-card h3:first-child { margin-top: 0; }
+  #book-card h3::before { content: ""; width: 4px; height: 14px; background: var(--accent);
+    border-radius: 2px; align-self: center; flex: none; }
+  .bm-row { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
+  #book-card input, #book-card select {
+    flex: 1; min-width: 0; font: inherit; font-size: 13px; padding: 7px 10px;
+    border: 1px solid var(--border-deep); border-radius: 7px; background: #fffef9; color: var(--ink);
+  }
+  .bm-hint { font-size: 12px; color: var(--ink-light); }
+  #book-card button {
+    all: unset; cursor: pointer; font-size: 13px; padding: 7px 16px; border-radius: 7px;
+    background: var(--ink); color: #f7f3e8; letter-spacing: 1px; white-space: nowrap;
+    transition: opacity 180ms ease, transform 180ms ease;
+  }
+  #book-card button:hover { opacity: 0.88; transform: translateY(-1px); }
+  #book-card button.bm-primary { background: var(--accent); }
+  #book-card button.bm-ghost { background: transparent; color: var(--ink-light);
+    border: 1px solid var(--border-deep); }
+  #book-card button.bm-ghost:hover { color: var(--accent); border-color: var(--accent); opacity: 1; }
+  #book-card button:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+</style>
+</head>
+<body>
+<main>
+  <!-- 直播区：书名信息 + （章节栏 + 当前页稿纸）（后续弹幕互动/投票等叠层加在这里） -->
+  <div id="live-area">
+    <div id="live-center">
+      <div id="stage-row">
+        <div id="paper-col">
+          <div id="book-info">
+            <div><span id="book-title"></span><span id="chapter-title"></span></div>
+            <div id="book-progress">共 <b id="p-words">0</b> 字 · 最低目标 <span id="p-target">-</span> 字</div>
+          </div>
+          <div id="sheet-row">
+            <nav id="chapter-rail" aria-label="章节目录">
+              <div class="rail-head">章节</div>
+              <div id="rail-list"></div>
+            </nav>
+            <div id="sheet-frame"><section id="paper" aria-label="小说稿纸"></section></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- 投票卡片（T8）：直播区左下角叠层，WS vote_* 消息驱动 -->
+  <div id="vote-card" hidden>
+    <div class="vote-head">观众投票</div>
+    <div id="vote-question"></div>
+    <div id="vote-options"></div>
+    <div id="vote-timer"></div>
+  </div>
+  <!-- 操作区：直播操作都收在这条底部横条 -->  <div id="op-bar">
+    <button id="btn-book" title="选书 / 生成新书">书…</button>
+    <button id="btn-pause" title="暂停写作" disabled>暂停</button>
+    <button id="btn-resume" title="恢复写作" disabled>恢复</button>
+    <button id="btn-skip" title="当前段瞬间放完" disabled>跳过段</button>
+    <span id="state-bar">空闲</span>
+    <span class="spacer"></span>
+    <button id="prev-page" class="ghost" title="上一页">◀ 上一页</button>
+    <span id="page-label">第 1 / 1 页</span>
+    <button id="next-page" class="ghost" title="下一页">下一页 ▶</button>
+    <button id="follow-btn" class="ghost" title="翻到最新页并恢复自动跟写" hidden>回到直播 ▶</button>
+    <span class="vsep"></span>
+    <input id="dm-room" placeholder="房间号 / 直播间链接" autocomplete="off">
+    <button id="dm-connect">连接</button>
+    <button id="dm-disconnect" class="ghost" title="断开弹幕">断</button>
+    <button id="dm-mock" class="ghost" title="演示模式（mock 弹幕）">演</button>
+    <span id="dm-status">未连接</span>
+    <button id="voice-mute" class="ghost" title="语音开关">🔊</button>
+  </div>
+</main>
+<aside id="danmaku-panel">
+  <div class="aside-head">弹幕</div>
+  <div id="danmaku-list"></div>
+  <div id="chat-bubbles"></div>
+</aside>
+<!-- 选书 / 生成新书面板（点操作区「书…」弹出） -->
+<div id="book-modal" hidden>
+  <div id="book-mask"></div>
+  <div id="book-card">
+    <h3>直播书</h3>
+    <div class="bm-row">
+      <select id="bm-select"></select>
+      <button id="bm-start">开写</button>
+    </div>
+    <h3>生成新书 <span class="bm-hint">设定卡可全部留空，AI 自定</span></h3>
+    <input id="bm-genre" placeholder="题材方向，如：都市异能（可空）">
+    <input id="bm-idea" placeholder="核心创意提示，如：能听见旧物回声的修复师（可空）">
+    <div class="bm-row">
+      <input id="bm-words" type="number" placeholder="目标字数（可空）">
+      <input id="bm-chapters" type="number" placeholder="目标章数（可空）">
+    </div>
+    <div class="bm-row">
+      <button id="bm-gen" class="bm-primary">生成并开写</button>
+      <button id="bm-close" class="bm-ghost">关闭</button>
+      <span class="bm-hint" id="bm-status">生成约需 1-2 分钟，完成后自动开始直播写作</span>
+    </div>
+  </div>
+</div>
+<script src="/static/stage-paper.js?v=9"></script>
+<script src="/static/stage-widgets.js?v=9"></script>
+<script src="/static/stage-main.js?v=9"></script>
+</body>
+</html>

@@ -1,0 +1,67 @@
+{
+  "server": {
+    "port": 8800
+  },
+  "llm": {
+    "presets": {
+      "my_gateway": { "base_url": "https://your-gateway.example.com/v1", "auth": "bearer", "api_key": "" }
+    },
+    "writing": {
+      "preset": "lmstudio",
+      "model": "google/gemma-4-e4b",
+      "api_key": "",
+      "temperature": 0.8,
+      "max_tokens": 2000,
+      "thinking": ""
+    },
+    "review": {
+      "preset": "",
+      "model": "",
+      "api_key": "",
+      "temperature": 0.3,
+      "max_tokens": 800,
+      "thinking": ""
+    },
+    "chat": {
+      "preset": "lmstudio",
+      "model": "google/gemma-4-e4b",
+      "api_key": "",
+      "temperature": 1.0,
+      "max_tokens": 300,
+      "thinking": ""
+    }
+  },
+  "tts": {
+    "enabled": false,
+    "url": "http://127.0.0.1:9877",
+    "voice": "v10",
+    "voices_dir": ""
+  },
+  "writing": {
+    "para_min": 200,
+    "para_max": 400,
+    "speed_ms": 100,
+    "target_words": 800000,
+    "target_chapters": 150,
+    "gap_seconds": 90,
+    "context_recent_paras": 5,
+    "chapter_max_words": 3000,
+    "review_recent_chapters": 2,
+    "review_every_paras": 0,
+    "roadmap_update_every": 10
+  },
+  "danmaku": {
+    "platform": "douyin",
+    "room_id": "",
+    "douyin_ws_url": "ws://127.0.0.1:1088"
+  },
+  "interaction": {
+    "chat_enabled": true,
+    "chat_interval": 8,
+    "vote_enabled": true,
+    "auto_vote": true,
+    "vote_duration": 90,
+    "gift_events_enabled": true,
+    "gift_rules": {}
+  }
+}
